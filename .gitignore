@@ -1,7 +1,6 @@
 (TPAMI23) Detection-Friendly_Dehazing_Object_Detection_in_Real-World_Hazy_Scenes.pdf
 __pycache__
 dataset
-test.png
-results/comparison.png
 mouse_clicker.py
-dataset.ipynb
+*.ipynb
+.vscode
