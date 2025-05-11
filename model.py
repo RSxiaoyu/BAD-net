@@ -92,7 +92,7 @@ class BADBackbone(nn.Module):
         # f_dehaze = torch.clamp(f_dehaze, min=eps)  # 限制最小值为eps
         # kl_loss = torch.mean(f_haze * (torch.log(f_haze) - torch.log(f_dehaze)))
         return torch.nn.functional.kl_div(
-            f_dehaze.log(), f_haze, reduction='mean'
+            f_dehaze.log(), f_haze, reduction='batchmean'
         )
 class BADNet(nn.Module):
     def __init__(self, num_classes=6):
