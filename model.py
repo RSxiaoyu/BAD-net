@@ -2,7 +2,7 @@ import torch
 from torch import nn
 import torchvision
 from torchvision.ops import MultiScaleRoIAlign
-from torchvision.models import mobilenet_v3_large
+from torchvision.models import mobilenet_v3_large,mobilenet_v3_small
 from torchvision.models.detection import FasterRCNN
 from torchvision.models.detection.rpn import AnchorGenerator
 def conv_bn_relu(in_channels,out_channels,kernel_size=3,padding='same',dilation=1):
@@ -47,7 +47,7 @@ class DehazingModule(nn.Module): # Fig 3 原图->去雾图
         return torch.relu(k * x - k + self.b)
 
 class AttentionFusionModule(nn.Module): #Fig 5 F_haze+F_dehaze->F_fuse
-    def __init__(self,in_channels,reduction=16):
+    def __init__(self,in_channels,reduction=32):
         super().__init__()
         self.gap_w=nn.AdaptiveAvgPool2d((None,1))
         self.gap_h=nn.AdaptiveAvgPool2d((1,None))
@@ -71,10 +71,11 @@ class AttentionFusionModule(nn.Module): #Fig 5 F_haze+F_dehaze->F_fuse
 class BADBackbone(nn.Module):
     def __init__(self):
         super().__init__()
-        self.mobilenet = mobilenet_v3_large(weights='DEFAULT').features
+        # self.mobilenet = mobilenet_v3_large(weights='DEFAULT').features
+        self.mobilenet=mobilenet_v3_small(weights='DEFAULT').features
+        self.out_channels = self.mobilenet[-1][0].out_channels  # FasterRCNN要求
         self.dehazing_module = DehazingModule()
-        self.attention_fusion = AttentionFusionModule(in_channels=960)
-        self.out_channels = 960  # FasterRCNN要求
+        self.attention_fusion = AttentionFusionModule(in_channels=self.out_channels)
         self.hr_loss=None
 
     def forward(self, x):
@@ -85,21 +86,22 @@ class BADBackbone(nn.Module):
         self.hr_loss=self.hrloss(f_haze,f_dehaze)
         return self.attention_fusion(f_haze, f_dehaze)
     def hrloss(self,f_haze,f_dehaze):
-        f_haze = torch.relu(torch.mean(f_haze, dim=(2, 3)))
-        f_dehaze = torch.relu(torch.mean(f_dehaze, dim=(2, 3)))
-        # eps = 1e-8
-        # f_haze = torch.clamp(f_haze, min=eps)  # 限制最小值为eps
-        # f_dehaze = torch.clamp(f_dehaze, min=eps)  # 限制最小值为eps
-        # kl_loss = torch.mean(f_haze * (torch.log(f_haze) - torch.log(f_dehaze)))
+        gap_haze = torch.mean(f_haze, dim=(2, 3))
+        gap_dehaze = torch.mean(f_dehaze, dim=(2, 3))
+        eps = 1e-8
+        gap_haze = torch.clamp(f_haze, min=eps)  # 限制最小值为eps
+        gap_dehaze = torch.clamp(f_dehaze, min=eps)  # 限制最小值为eps
+        norm_haze=gap_haze/gap_haze.sum(dim=1,keepdim=True)
+        norm_dehaze=gap_dehaze/gap_dehaze.sum(dim=1,keepdim=True)
         return torch.nn.functional.kl_div(
-            f_dehaze.log(), f_haze, reduction='batchmean'
+            norm_dehaze.log(), norm_haze, reduction='batchmean'
         )
 class BADNet(nn.Module):
     def __init__(self, num_classes=6):
         super().__init__()
         self.backbone = BADBackbone()
         anchor_generator = AnchorGenerator(
-            sizes=((32, 64, 128, 256, 512),),
+            sizes=((32, 64),),
             aspect_ratios=((0.5, 1.0, 2.0),)
         )
         box_roi_pool = MultiScaleRoIAlign(
@@ -132,6 +134,6 @@ if __name__ == '__main__':
     losses = model(images, targets)
     print("训练损失:", losses)
 
-    model.eval()
-    detections = model(images)
-    print("推理结果:", detections)
+    # model.eval()
+    # detections = model(images)
+    # print("推理结果:", detections)
