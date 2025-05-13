@@ -1,7 +1,7 @@
 import torch
 from pprint import pprint
 from torchvision.transforms import v2
-from torch.utils.data import DataLoader,ConcatDataset
+from torch.utils.data import DataLoader,ConcatDataset,Subset
 from torchvision.datasets import VOCDetection,wrap_dataset_for_transforms_v2
 
 
@@ -36,29 +36,28 @@ def voc_dataset(root='./dataset',year='2007',image_set='test'):
     return wrap_dataset_for_transforms_v2(voc_dataset)
 
 
-def train_loader():
+def train_loader(batch_size=8,subset=None):
     voc2007_trainval=voc_dataset(image_set='trainval')
     print('VOC 2007 trainval loaded.')
     voc2012_trainval=voc_dataset(year='2012',image_set='trainval')
     print('VOC 2012 trainval loaded.')
     voc_trainval=ConcatDataset([voc2007_trainval,voc2012_trainval])
+    if subset:
+        voc_trainval=Subset(voc_trainval,subset)
     print('VOC trainval ready.')
     return DataLoader(
         voc_trainval,
-        batch_size=10,
+        batch_size=batch_size,
         shuffle=True,
         collate_fn=lambda batch: (torch.stack([x[0] for x in batch]),[x[1] for x in batch]),
     )
-def test_loader():
+def test_loader(batch_size=8,subset=None):
     voc_test=voc_dataset()
+    if subset:
+        voc_test=Subset(voc_test,subset)
     print('VOC test ready.')
     return DataLoader(
         voc_test,
-        batch_size=10,
-        shuffle=True,
+        batch_size=batch_size,
         collate_fn=lambda batch: (torch.stack([x[0] for x in batch]),[x[1] for x in batch]),
     )
-
-if __name__=='__main__':
-   voc_dataset=voc_dataset()
-   print(voc_dataset[0][1])
