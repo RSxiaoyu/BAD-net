@@ -11,6 +11,7 @@ classes = [
 ] # index = class + 1
 target_classes=['','person','bicycle','motorbike','bus','car']
 collate_fn=lambda batch: (torch.stack([x[0] for x in batch]),[x[1] for x in batch])
+
 def add_haze(dehazed_image, level=0.05):
     C, H, W = dehazed_image.shape
     y, x = torch.meshgrid(torch.arange(H,device=dehazed_image.device), torch.arange(W,device=dehazed_image.device), indexing='ij')
@@ -47,6 +48,7 @@ def voc_dataset(root='./dataset',year='2007',image_set='test'):
     transforms=v2.Compose([
         FilterCategories(target_classes),
         v2.ToImage(),
+        RandomHazeTransform(),
         v2.Resize((224,224)),
         v2.ToDtype(torch.float32,scale=True)
     ])
@@ -57,9 +59,9 @@ def voc_dataset(root='./dataset',year='2007',image_set='test'):
 def train_loader(batch_size=8,subset=None):
     voc2007_trainval=voc_dataset(image_set='trainval')
     print('VOC 2007 trainval loaded.')
-    voc2012_trainval=voc_dataset(year='2012',image_set='trainval')
-    print('VOC 2012 trainval loaded.')
-    voc_trainval=ConcatDataset([voc2007_trainval,voc2012_trainval])
+    # voc2012_trainval=voc_dataset(year='2012',image_set='trainval')
+    # print('VOC 2012 trainval loaded.')
+    # voc_trainval=ConcatDataset([voc2007_trainval,voc2012_trainval])
     if subset:
         voc_trainval=Subset(voc2007_trainval,subset)
     print('VOC trainval ready.')
